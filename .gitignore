@@ -23,3 +23,7 @@ __pycache__/
 *.compiled.js
 package-lock.json
 
+node_modules/
+.env
+out.txt
+deploy.txt

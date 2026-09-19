@@ -1,143 +1,68 @@
-# Sample GenLayer project
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit/)
-[![Discord](https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/8Jm4v89VAu)
-[![Telegram](https://img.shields.io/badge/Telegram--T.svg?style=social&logo=telegram)](https://t.me/genlayer)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/yeagerai.svg?style=social&label=Follow%20%40GenLayer)](https://x.com/GenLayer)
-[![GitHub star chart](https://img.shields.io/github/stars/yeagerai/genlayer-project-boilerplate?style=social)](https://star-history.com/#yeagerai/genlayer-js)
+# BugBounty: Automated Bug Bounties on GenLayer
 
-## About
-This project includes the boilerplate code for a GenLayer use case implementation, specifically a football bets game.
+An Intelligent Contract that lets a maintainer post a bounty against a repo issue and lets GenLayer validators decide, using an LLM, whether a contributor's pull request is merged and how severe the fixed bug is. The severity tier is agreed on by validator consensus, so no single party decides the outcome.
 
-## What's included
-- An example intelligent contract (Football Bets) with web access and LLM integration
-- **Direct mode tests** — fast, in-memory unit tests with web/LLM mocking (~ms per test)
-- **Integration tests** — full end-to-end tests against GenLayer Studio
-- **Contract linting** — static analysis to catch common contract issues before deployment
-- **CI pipeline** — GitHub Actions workflow for linting and direct tests
-- A production-ready Next.js 15 frontend with TypeScript, TanStack Query, and Radix UI
-- Configuration file template and deployment scripts
+- **Network:** GenLayer Studio (studionet)
+- **Contract address:** `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`
+- **Contract file:** `contracts/bug_bounty.py`
 
-## Requirements
-- Python >= 3.12
-- [GenLayer CLI](https://github.com/genlayerlabs/genlayer-cli) globally installed: `npm install -g genlayer`
-- GenLayer Studio (for integration tests and deployment): Install from [Docs](https://docs.genlayer.com/developers/intelligent-contracts/tooling-setup#using-the-genlayer-studio) or use the hosted [GenLayer Studio](https://studio.genlayer.com/)
+## Why GenLayer
 
-## Project Structure
+Judging a pull request is subjective and lives on the open web. A normal smart contract cannot read a GitHub page or interpret it. Here, every validator fetches the PR page itself (`gl.nondet.web.render`), asks an LLM for a structured verdict (`gl.nondet.exec_prompt`), and the network must agree on the result (`gl.eq_principle.strict_eq`) before the bounty state changes.
+
+## How it works
+
+1. **`create_bounty(repo_url, issue_id, amount)`** creates a bounty keyed by the creator's address. Returns an id such as `issue-42_0`.
+2. **`resolve_bounty(creator, bounty_id, pr_url, contributor)`**:
+   - each validator fetches the PR page and asks the LLM for `{"merged": bool, "severity": "critical|high|medium|low"}`
+   - validators must return identical JSON (strict equality)
+   - if the PR is merged and the severity is valid, the bounty becomes `resolved` and records the PR, severity, and contributor
+3. **`cancel_bounty(bounty_id)`** lets the creator cancel an open bounty.
+4. **`get_bounties()`** and **`get_bounty(creator, bounty_id)`** are read-only views.
+
+Severity tiers map to payout percentages of the escrowed amount: critical 100%, high 70%, medium 40%, low 20%. The model's answer is normalized (lowercased, "moderate" is treated as "medium") so a reasonable synonym does not cause a revert.
+
+## Try it
+
+Using the GenLayer CLI (`genlayer network set studionet` first):
 
 ```
-contracts/              # Python intelligent contracts
-tests/
-  direct/               # Fast in-memory tests (no Studio required)
-    test_create_bet.py   # Bet creation logic
-    test_resolve_bet.py  # Bet resolution with web/LLM mocks
-    test_views.py        # Read-only view methods
-  integration/           # Full tests against GenLayer Studio
-    test_football_bets.py
-    fixtures.py          # Expected state fixtures
-frontend/               # Next.js 15 app (TypeScript, TanStack Query, Radix UI)
-deploy/                 # TypeScript deployment scripts
-gltest.config.yaml      # Test runner network configuration
-pyproject.toml          # Python/pytest configuration
-.github/workflows/      # CI pipeline
+genlayer write 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF create_bounty --args "https://github.com/vuejs/vuepress" "issue-42" 1000000
+
+genlayer call 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF get_bounties
+
+genlayer write 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF resolve_bounty --args 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8 issue-42_0 "https://github.com/vuejs/vuepress/pull/2500" 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8
+
+genlayer call 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF get_bounties
 ```
 
-## Quick Start
+`resolve_bounty` needs a **merged** pull request on a public repo whose description makes the bug and its severity reasonably clear.
 
-### 1. Set up Python environment
+## Verified run
 
-```shell
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+Bounty `issue-42_0` was created, then resolved against a merged security-fix PR (`vuejs/vuepress#2500`). Final state read back from the contract:
+
+```
+status:      resolved
+severity:    medium
+pr_url:      https://github.com/vuejs/vuepress/pull/2500
+resolved_to: 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8
+amount:      1000000
 ```
 
-### 2. Lint your contracts
+## Notes for the GenVM SDK
 
-Run the GenVM linter to catch issues before deployment:
+Things learned while building this that may save other builders time:
 
-```shell
-genvm-lint check contracts/football_bets.py
-```
+- Addresses passed through the CLI arrive as `Address` objects, not strings. Declare method parameters as `Address`, not `str`, or `Address(x)` will raise a `TypeError`.
+- Use `gl.eq_principle.strict_eq(fn)` for LLM consensus and `gl.nondet.web.render(url, mode="text")` to fetch a page.
+- Keep `@allow_storage @dataclass` fields to plain types (`str`, `bool`); store amounts as strings.
+- Raise `Exception(...)` for validation failures.
+- A contract exception still shows as `ACCEPTED` at the consensus level (validators agree it reverted). Always read state back to confirm it changed.
 
-The linter catches:
-- Forbidden imports and non-deterministic calls
-- Invalid storage types (must use `TreeMap`, `DynArray`, `u256`, etc.)
-- Missing decorators and return type annotations
-- Non-deterministic operations outside equivalence principle blocks
-- And [20+ other rules](https://github.com/genlayerlabs/genvm-linter)
+## Known limitations
 
-### 3. Run direct mode tests
-
-Direct mode tests run contracts in-memory without needing GenLayer Studio. They use mocks for web requests and LLM calls, giving you fast feedback (~milliseconds per test):
-
-```shell
-pytest tests/direct/ -v
-```
-
-Direct mode features used in these tests:
-- `direct_deploy("contracts/file.py")` — deploy contract in memory
-- `direct_vm.sender = address` — set transaction sender
-- `direct_vm.mock_web(pattern, response)` — mock HTTP/render calls
-- `direct_vm.mock_llm(pattern, response)` — mock LLM responses
-- `direct_vm.expect_revert("message")` — assert expected failures
-- `direct_vm.clear_mocks()` — reset mocks between calls
-
-### 4. Deploy the contract
-
-1. Choose your network: `genlayer network`
-2. Deploy: `genlayer deploy` (runs the script in `/deploy/deployScript.ts`)
-
-### 5. Run integration tests
-
-Integration tests deploy the contract to GenLayer Studio and test with real consensus:
-
-```shell
-gltest tests/integration/ -v -s
-```
-
-These require GenLayer Studio running (local or hosted).
-
-### 6. Set up the frontend
-
-1. Copy `frontend/.env.example` to `frontend/.env`
-2. Add your deployed contract address as `NEXT_PUBLIC_CONTRACT_ADDRESS`
-3. Run:
-
-```shell
-cd frontend
-npm install
-npm run dev
-```
-
-The app will be available at http://localhost:3000/.
-
-## How the Football Bets Contract Works
-
-1. **Creating Bets**: Users bet on a football match by providing the game date, teams, and predicted winner.
-2. **Resolving Bets**: After the match, the contract fetches results from BBC Sport, uses an LLM to extract the score, and validates via the equivalence principle.
-3. **Points**: Correct predictions earn points. Users can query their points or the leaderboard.
-
-## Testing Strategy
-
-| Test Type | Command | Speed | Requires Studio |
-|-----------|---------|-------|-----------------|
-| **Lint** | `genvm-lint check contracts/*.py` | ~250ms | No |
-| **Direct** | `pytest tests/direct/ -v` | ~ms/test | No |
-| **Integration** | `gltest tests/integration/ -v -s` | ~min/test | Yes |
-
-**Recommended workflow:**
-1. Lint after every contract change
-2. Run direct tests frequently during development
-3. Run integration tests before deployment to verify consensus behavior
-
-For AI coding agents (Claude Code, Cursor, etc.), the linter and direct tests provide the fast feedback loop needed for iterative development without requiring a running Studio instance.
-
-## Community
-- **[Discord](https://discord.gg/8Jm4v89VAu)**: Discussions, support, and announcements
-- **[Telegram](https://t.me/genlayer)**: Informal chats and quick updates
-
-## Documentation
-For detailed information, see our [documentation](https://docs.genlayer.com/).
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **No fund custody yet.** `amount` is stored as a number; no tokens are escrowed or transferred, and the payout code is left commented out until value handling is wired up.
+- **No access control on `resolve_bounty`.** Any caller can currently resolve an open bounty by supplying a creator, a merged PR, and a contributor. A production version should restrict this to the creator or a designated reviewer.
+- **PR-to-issue linkage is not verified.** The LLM checks that the PR is merged and estimates severity, but does not confirm that the PR actually closes the referenced issue.
+- **Strict consensus.** `strict_eq` requires byte-identical JSON from all validators. In testing, validators occasionally disagreed and the majority decided. `gl.eq_principle.prompt_comparative` would tolerate near-equivalent answers.
