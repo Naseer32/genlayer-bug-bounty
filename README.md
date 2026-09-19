@@ -1,5 +1,7 @@
 # BugBounty: Automated Bug Bounties on GenLayer
 
+> Built on the GenLayer project boilerplate. The contribution of this submission is `contracts/bug_bounty.py` and its deploy script (`deploy/deployScript.ts`).
+
 An Intelligent Contract that lets a maintainer post a bounty against a repo issue and lets GenLayer validators decide, using an LLM, whether a contributor's pull request is merged and how severe the fixed bug is. The severity tier is agreed on by validator consensus, so no single party decides the outcome.
 
 - **Network:** GenLayer Studio (studionet)
@@ -49,6 +51,8 @@ pr_url:      https://github.com/vuejs/vuepress/pull/2500
 resolved_to: 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8
 amount:      1000000
 ```
+
+Resolve transaction hash: `0xbe905a3469c876d3f4ead1355e9cf522e2f28004e9513df5fa4d03f0801bb636`
 
 ## Notes for the GenVM SDK
 
