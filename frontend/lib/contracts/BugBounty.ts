@@ -79,7 +79,8 @@ class BugBounty {
       return receipt as TransactionReceipt;
     } catch (error) {
       console.error("Error creating bounty:", error);
-      throw new Error("Failed to create bounty");
+      const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+      throw new Error("Failed to create bounty: " + msg.slice(0, 250));
     }
   }
 }
