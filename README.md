@@ -7,6 +7,7 @@ An Intelligent Contract that lets a maintainer post a bounty against a repo issu
 - **Network:** GenLayer Studio (studionet)
 - **Contract address:** `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`
 - **Contract file:** `contracts/bug_bounty.py`
+- **Live app:** https://genlayer-bug-bounty-rzyh.vercel.app/ (source in `frontend/`)
 
 ## Why GenLayer
 
