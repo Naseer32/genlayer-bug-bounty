@@ -1,6 +1,7 @@
 "use client";
 
 import { useBounties } from "@/lib/hooks/useBugBounty";
+import { ResolveBounty } from "./ResolveBounty";
 
 function short(a: string) {
   return a && a.length > 12 ? `${a.slice(0, 6)}...${a.slice(-4)}` : a;
@@ -64,6 +65,7 @@ export function BountiesTable() {
                 </div>
               )}
               {b.resolved_to && <div>Paid to: {short(b.resolved_to)}</div>}
+              {b.status === "open" && <ResolveBounty bounty={b} />}
             </div>
           </div>
         ))}

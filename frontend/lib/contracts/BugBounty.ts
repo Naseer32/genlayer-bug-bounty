@@ -1,6 +1,8 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import type { Bounty, TransactionReceipt } from "./types";
+import { CalldataAddress } from "genlayer-js/types";
+import { hexToBytes } from "viem";
 
 // Works for both Map and plain-object results
 function entriesOf(v: any): [string, any][] {
@@ -81,6 +83,47 @@ class BugBounty {
       console.error("Error creating bounty:", error);
       const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
       throw new Error("Failed to create bounty: " + msg.slice(0, 250));
+    }
+  }
+  private toAddr(a: string): CalldataAddress {
+    if (!/^0x[0-9a-fA-F]{40}$/.test(a)) {
+      throw new Error("Invalid address: " + a);
+    }
+    return new CalldataAddress(hexToBytes(a as `0x${string}`));
+  }
+
+  async resolveBounty(
+    creator: string,
+    bountyId: string,
+    prUrl: string,
+    contributor: string
+  ): Promise<TransactionReceipt> {
+    try {
+      const txHash = await this.client.writeContract({
+        address: this.contractAddress,
+        functionName: "resolve_bounty",
+        args: [this.toAddr(creator), bountyId, prUrl, this.toAddr(contributor)],
+        value: BigInt(0),
+      });
+      const receipt = await this.client.waitForTransactionReceipt({
+        hash: txHash,
+        status: "ACCEPTED" as any,
+        retries: 60,
+        interval: 5000,
+      });
+      const all = await this.getBounties();
+      const after = all.find(
+        (b) => b.id === bountyId && b.creator.toLowerCase() === creator.toLowerCase()
+      );
+      if (!after || after.status !== "resolved") {
+        throw new Error(
+          "The contract did not resolve this bounty. The pull request may not be merged, or the AI could not decide its severity."
+        );
+      }
+      return receipt as TransactionReceipt;
+    } catch (error) {
+      const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
+      throw new Error(msg.slice(0, 300));
     }
   }
 }

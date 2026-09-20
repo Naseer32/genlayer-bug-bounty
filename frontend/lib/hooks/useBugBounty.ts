@@ -94,3 +94,54 @@ export function useCreateBounty() {
     createBountyAsync: mutation.mutateAsync,
   };
 }
+
+export function useResolveBounty() {
+  const contract = useBugBountyContract();
+  const { address } = useWallet();
+  const queryClient = useQueryClient();
+  const [isResolving, setIsResolving] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: async ({
+      creator,
+      bountyId,
+      prUrl,
+      contributor,
+    }: {
+      creator: string;
+      bountyId: string;
+      prUrl: string;
+      contributor: string;
+    }) => {
+      if (!contract) {
+        throw new Error("Contract not configured.");
+      }
+      if (!address) {
+        throw new Error("Wallet not connected. Please connect your wallet first.");
+      }
+      setIsResolving(true);
+      return contract.resolveBounty(creator, bountyId, prUrl, contributor);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bounties"] });
+      setIsResolving(false);
+      success("Bounty resolved!", {
+        description: "GenLayer validators agreed on the severity.",
+      });
+    },
+    onError: (err: any) => {
+      console.error("Error resolving bounty:", err);
+      queryClient.invalidateQueries({ queryKey: ["bounties"] });
+      setIsResolving(false);
+      error("Could not resolve bounty", {
+        description: err?.message || "Please try again.",
+      });
+    },
+  });
+
+  return {
+    ...mutation,
+    isResolving,
+    resolveBounty: mutation.mutate,
+  };
+}
