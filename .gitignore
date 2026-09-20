@@ -27,3 +27,5 @@ node_modules/
 .env
 out.txt
 deploy.txt
+.env.local
+frontend/tsconfig.tsbuildinfo

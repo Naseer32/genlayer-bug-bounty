@@ -31,3 +31,15 @@ export interface BetFilters {
   resolved?: boolean;
   owner?: string;
 }
+
+export interface Bounty {
+  id: string;
+  creator: string;
+  repo_url: string;
+  issue_id: string;
+  amount: string;
+  status: string;
+  pr_url: string;
+  severity: string;
+  resolved_to: string;
+}
