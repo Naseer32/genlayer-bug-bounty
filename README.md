@@ -1,73 +1,61 @@
-# BugBounty: Automated Bug Bounties on GenLayer
+# BugBounty: AI-verified bug bounties with real escrow on GenLayer
 
-> Built on the GenLayer project boilerplate. The contribution of this submission is `contracts/bug_bounty.py` and its deploy script (`deploy/deployScript.ts`).
+> Built on the GenLayer project boilerplate. The contribution of this project is the Intelligent Contract `contracts/bug_bounty_v2.py`, its deploy script, and the web app in `frontend/`.
 
-An Intelligent Contract that lets a maintainer post a bounty against a repo issue and lets GenLayer validators decide, using an LLM, whether a contributor's pull request is merged and how severe the fixed bug is. The severity tier is agreed on by validator consensus, so no single party decides the outcome.
+A maintainer creates a bounty for one issue of one GitHub repo and escrows real GEN. When a contributor's pull request is merged, GenLayer validators read the PR, an LLM judges how severe the fixed bug is, and the contract pays the contributor a share of the escrow by severity. The rest goes back to the maintainer.
 
+- **Live app:** https://genlayer-bug-bounty-rzyh.vercel.app/
 - **Network:** GenLayer Studio (studionet)
-- **Contract address:** `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`
-- **Contract file:** `contracts/bug_bounty.py`
-- **Live app:** https://genlayer-bug-bounty-rzyh.vercel.app/ (source in `frontend/`)
-
-## Why GenLayer
-
-Judging a pull request is subjective and lives on the open web. A normal smart contract cannot read a GitHub page or interpret it. Here, every validator fetches the PR page itself (`gl.nondet.web.render`), asks an LLM for a structured verdict (`gl.nondet.exec_prompt`), and the network must agree on the result (`gl.eq_principle.strict_eq`) before the bounty state changes.
+- **Contract (v2):** `0xb1A11A0dE45D4E770Ab67013312c36F7626D6713`
+- **Explorer:** https://explorer-studio.genlayer.com/address/0xb1A11A0dE45D4E770Ab67013312c36F7626D6713
+- **Contract file:** `contracts/bug_bounty_v2.py`
 
 ## How it works
 
-1. **`create_bounty(repo_url, issue_id, amount)`** creates a bounty keyed by the creator's address. Returns an id such as `issue-42_0`.
-2. **`resolve_bounty(creator, bounty_id, pr_url, contributor)`**:
-   - each validator fetches the PR page and asks the LLM for `{"merged": bool, "severity": "critical|high|medium|low"}`
-   - validators must return identical JSON (strict equality)
-   - if the PR is merged and the severity is valid, the bounty becomes `resolved` and records the PR, severity, and contributor
-3. **`cancel_bounty(bounty_id)`** lets the creator cancel an open bounty.
-4. **`get_bounties()`** and **`get_bounty(creator, bounty_id)`** are read-only views.
+1. **`create_bounty(repo_url, issue_number)`** is `payable`. The GEN attached to the transaction is held in escrow by the contract. The bounty is registered against `owner/repo` and the issue number.
+2. **`resolve_bounty(bounty_id, pr_url)`** can only be called by the bounty creator. The contract then enforces, in code:
+   - the PR URL is inside the registered repository
+   - the PR page says it fixes the registered issue (`Fixes #N`)
+   - the PR page declares a payout wallet (`Payout: 0x...`)
 
-Severity tiers map to payout percentages of the escrowed amount: critical 100%, high 70%, medium 40%, low 20%. The model's answer is normalized (lowercased, "moderate" is treated as "medium") so a reasonable synonym does not cause a revert.
+   Every validator fetches the PR page itself. The LLM only judges two things: is the PR merged, and how severe is the fixed bug (`critical`, `high`, `medium`, `low`). Validators must return identical JSON (`strict_eq`) before anything changes.
+3. **Payout:** the wallet declared in the merged PR receives a share of the escrow by severity (critical 100%, high 70%, medium 40%, low 20%) through `emit_transfer`. The remainder is refunded to the creator.
+4. **`cancel_bounty(bounty_id)`** lets the creator cancel an open bounty and get the escrow back.
+5. **`get_bounties()`** is a read-only view.
 
-## Try it
+## Verified run (GenLayer Studio)
 
-Using the GenLayer CLI (`genlayer network set studionet` first):
+Demo repo: https://github.com/Naseer32/bounty-demo. Issue #1 reports a stored XSS. PR #3 fixes it, says `Fixes #1`, and declares a payout wallet.
 
-```
-genlayer write 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF create_bounty --args "https://github.com/vuejs/vuepress" "issue-42" 1000000
-
-genlayer call 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF get_bounties
-
-genlayer write 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF resolve_bounty --args 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8 issue-42_0 "https://github.com/vuejs/vuepress/pull/2500" 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8
-
-genlayer call 0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF get_bounties
-```
-
-`resolve_bounty` needs a **merged** pull request on a public repo whose description makes the bug and its severity reasonably clear.
-
-## Verified run
-
-Bounty `issue-42_0` was created, then resolved against a merged security-fix PR (`vuejs/vuepress#2500`). Final state read back from the contract:
+A bounty of 0.5 GEN was created for that issue from a MetaMask wallet and resolved in the web app with PR #3:
 
 ```
-status:      resolved
-severity:    medium
-pr_url:      https://github.com/vuejs/vuepress/pull/2500
-resolved_to: 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8
-amount:      1000000
+id:        issue-1_0
+status:    resolved
+severity:  high
+escrow:    0.5 GEN
+paid:      0.35 GEN to 0x5f463B8CAC925dA573594E63adC1Bc3AA98229C8 (70%, high)
+refunded:  0.15 GEN to the creator
 ```
 
-Resolve transaction hash: `0xbe905a3469c876d3f4ead1355e9cf522e2f28004e9513df5fa4d03f0801bb636`
+To reproduce: open the app, connect a wallet with some GEN on GenLayer Studio, create a bounty for `https://github.com/Naseer32/bounty-demo` issue `1`, then resolve it with `https://github.com/Naseer32/bounty-demo/pull/3`.
 
 ## Notes for the GenVM SDK
 
-Things learned while building this that may save other builders time:
-
-- Addresses passed through the CLI arrive as `Address` objects, not strings. Declare method parameters as `Address`, not `str`, or `Address(x)` will raise a `TypeError`.
+- `@gl.public.write.payable` and `gl.message.value` receive GEN. Pay out with `emit_transfer` on an `@gl.evm.contract_interface` (same pattern as the Arbiter escrow contract).
+- Addresses sent from a JS client and from the CLI arrive as `Address` objects, not strings. This contract avoids address arguments: the creator is `gl.message.sender_address`, and the recipient is read from the PR.
 - Use `gl.eq_principle.strict_eq(fn)` for LLM consensus and `gl.nondet.web.render(url, mode="text")` to fetch a page.
-- Keep `@allow_storage @dataclass` fields to plain types (`str`, `bool`); store amounts as strings.
-- Raise `Exception(...)` for validation failures.
-- A contract exception still shows as `ACCEPTED` at the consensus level (validators agree it reverted). Always read state back to confirm it changed.
+- A contract exception still shows as `ACCEPTED` at the consensus level (validators agree it reverted). Always read state back to confirm it changed. The web app does this.
+- The CLI has no option to attach GEN to a write, so escrowed bounties are created from the web app.
 
 ## Known limitations
 
-- **No fund custody yet.** `amount` is stored as a number; no tokens are escrowed or transferred, and the payout code is left commented out until value handling is wired up.
-- **No access control on `resolve_bounty`.** Any caller can currently resolve an open bounty by supplying a creator, a merged PR, and a contributor. A production version should restrict this to the creator or a designated reviewer.
-- **PR-to-issue linkage is not verified.** The LLM checks that the PR is merged and estimates severity, but does not confirm that the PR actually closes the referenced issue.
-- **Strict consensus.** `strict_eq` requires byte-identical JSON from all validators. In testing, validators occasionally disagreed and the majority decided. `gl.eq_principle.prompt_comparative` would tolerate near-equivalent answers.
+- **The creator controls resolution.** Only the creator can resolve or cancel, so a creator could cancel and reclaim the escrow after a fix is merged. A production version should lock the escrow for a period or add a dispute step.
+- **The payout wallet is read from the PR text.** Anyone who can edit the PR description can change it. Only merged PRs count, so the maintainer has reviewed it, but a stricter design would bind the wallet to the PR author.
+- **Prompt injection.** The LLM reads the PR page. The prompt tells it to ignore instructions in the page, but that is not a guarantee.
+- **Strict consensus.** `strict_eq` needs identical JSON from all validators. In testing, validators occasionally disagreed and the majority decided. `gl.eq_principle.prompt_comparative` would tolerate near-equivalent answers.
+- **GitHub availability.** Validators load the public PR page, so private repos are not supported.
+
+## Version 1
+
+The first version (`contracts/bug_bounty.py`, address `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`) had no escrow and no access control. It is kept only for history.
