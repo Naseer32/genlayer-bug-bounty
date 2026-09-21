@@ -17,7 +17,7 @@ export function useBugBountyContract(): BugBounty | null {
     if (!contractAddress) {
       configError(
         "Setup Required",
-        "Contract address not configured. Please set NEXT_PUBLIC_CONTRACT_ADDRESS.",
+        "Contract address not configured.",
         {
           label: "Setup Guide",
           onClick: () => window.open("/docs/setup", "_blank"),
@@ -55,12 +55,12 @@ export function useCreateBounty() {
   const mutation = useMutation({
     mutationFn: async ({
       repoUrl,
-      issueId,
-      amount,
+      issueNumber,
+      amountGen,
     }: {
       repoUrl: string;
-      issueId: string;
-      amount: number;
+      issueNumber: string;
+      amountGen: string;
     }) => {
       if (!contract) {
         throw new Error("Contract not configured.");
@@ -69,17 +69,18 @@ export function useCreateBounty() {
         throw new Error("Wallet not connected. Please connect your wallet first.");
       }
       setIsCreating(true);
-      return contract.createBounty(repoUrl, issueId, amount);
+      return contract.createBounty(repoUrl, issueNumber, amountGen);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bounties"] });
       setIsCreating(false);
       success("Bounty created!", {
-        description: "Your bounty has been recorded on GenLayer.",
+        description: "Your GEN is now held in escrow by the contract.",
       });
     },
     onError: (err: any) => {
       console.error("Error creating bounty:", err);
+      queryClient.invalidateQueries({ queryKey: ["bounties"] });
       setIsCreating(false);
       error("Failed to create bounty", {
         description: err?.message || "Please try again.",
@@ -106,12 +107,10 @@ export function useResolveBounty() {
       creator,
       bountyId,
       prUrl,
-      contributor,
     }: {
       creator: string;
       bountyId: string;
       prUrl: string;
-      contributor: string;
     }) => {
       if (!contract) {
         throw new Error("Contract not configured.");
@@ -120,13 +119,13 @@ export function useResolveBounty() {
         throw new Error("Wallet not connected. Please connect your wallet first.");
       }
       setIsResolving(true);
-      return contract.resolveBounty(creator, bountyId, prUrl, contributor);
+      return contract.resolveBounty(creator, bountyId, prUrl);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bounties"] });
       setIsResolving(false);
       success("Bounty resolved!", {
-        description: "GenLayer validators agreed on the severity.",
+        description: "The contributor was paid from the escrow.",
       });
     },
     onError: (err: any) => {

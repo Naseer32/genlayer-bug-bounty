@@ -6,11 +6,15 @@ import { useCreateBounty } from "@/lib/hooks/useBugBounty";
 export function CreateBountyForm() {
   const { createBounty, isCreating } = useCreateBounty();
   const [repoUrl, setRepoUrl] = useState("");
-  const [issueId, setIssueId] = useState("");
+  const [issueNumber, setIssueNumber] = useState("");
   const [amount, setAmount] = useState("");
 
   const valid =
-    repoUrl.startsWith("http") && issueId.trim().length > 0 && Number(amount) > 0;
+    repoUrl.trim().startsWith("https://github.com/") &&
+    /^[0-9]+$/.test(issueNumber) &&
+    Number(issueNumber) >= 1 &&
+    /^[0-9]*\.?[0-9]+$/.test(amount) &&
+    Number(amount) > 0;
 
   const inputClass =
     "w-full rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm";
@@ -27,26 +31,27 @@ export function CreateBountyForm() {
         />
         <input
           className={inputClass}
-          placeholder="Issue ID (e.g. issue-42)"
-          value={issueId}
-          onChange={(e) => setIssueId(e.target.value)}
+          placeholder="Issue number (e.g. 1)"
+          inputMode="numeric"
+          value={issueNumber}
+          onChange={(e) => setIssueNumber(e.target.value.replace(/[^0-9]/g, ""))}
         />
         <input
           className={inputClass}
-          placeholder="Amount (whole number)"
-          inputMode="numeric"
+          placeholder="Reward in GEN (e.g. 0.5)"
+          inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ""))}
+          onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
         />
         <button
           disabled={!valid || isCreating}
           onClick={() =>
             createBounty(
-              { repoUrl: repoUrl.trim(), issueId: issueId.trim(), amount: Number(amount) },
+              { repoUrl: repoUrl.trim(), issueNumber, amountGen: amount },
               {
                 onSuccess: () => {
                   setRepoUrl("");
-                  setIssueId("");
+                  setIssueNumber("");
                   setAmount("");
                 },
               }
@@ -57,7 +62,7 @@ export function CreateBountyForm() {
           {isCreating ? "Creating..." : "Create Bounty"}
         </button>
         <p className="text-xs text-muted-foreground">
-          Connect your wallet first. This version records the amount but does not move real funds yet.
+          Connect your wallet first. The GEN you enter is held in escrow by the contract until you resolve or cancel the bounty.
         </p>
       </div>
     </div>

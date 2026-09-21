@@ -42,4 +42,6 @@ export interface Bounty {
   pr_url: string;
   severity: string;
   resolved_to: string;
+  payout_amount?: string;
+  repo?: string;
 }

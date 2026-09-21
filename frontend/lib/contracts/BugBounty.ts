@@ -1,8 +1,7 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
+import { parseEther } from "viem";
 import type { Bounty, TransactionReceipt } from "./types";
-import { CalldataAddress } from "genlayer-js/types";
-import { hexToBytes } from "viem";
 
 // Works for both Map and plain-object results
 function entriesOf(v: any): [string, any][] {
@@ -54,6 +53,8 @@ class BugBounty {
             pr_url: String(b.pr_url ?? ""),
             severity: String(b.severity ?? ""),
             resolved_to: String(b.resolved_to ?? ""),
+            payout_amount: String(b.payout_amount ?? "0"),
+            repo: String(b.repo ?? ""),
           });
         }
       }
@@ -64,60 +65,64 @@ class BugBounty {
     }
   }
 
-  async createBounty(repoUrl: string, issueId: string, amount: number): Promise<TransactionReceipt> {
+  private waitFor(txHash: any, retries: number) {
+    return this.client.waitForTransactionReceipt({
+      hash: txHash,
+      status: "ACCEPTED" as any,
+      retries,
+      interval: 5000,
+    });
+  }
+
+  // Escrows real GEN: amountGen is a decimal string such as "0.5"
+  async createBounty(
+    repoUrl: string,
+    issueNumber: string,
+    amountGen: string
+  ): Promise<TransactionReceipt> {
     try {
+      const before = (await this.getBounties()).length;
       const txHash = await this.client.writeContract({
         address: this.contractAddress,
         functionName: "create_bounty",
-        args: [repoUrl, issueId, BigInt(amount)],
-        value: BigInt(0),
+        args: [repoUrl, issueNumber],
+        value: parseEther(amountGen),
       });
-      const receipt = await this.client.waitForTransactionReceipt({
-        hash: txHash,
-        status: "ACCEPTED" as any,
-        retries: 24,
-        interval: 5000,
-      });
+      const receipt = await this.waitFor(txHash, 24);
+      const after = (await this.getBounties()).length;
+      if (after <= before) {
+        throw new Error(
+          "The contract rejected the bounty. Check the repo URL, the issue number and your GEN balance."
+        );
+      }
       return receipt as TransactionReceipt;
     } catch (error) {
-      console.error("Error creating bounty:", error);
       const msg = (error as any)?.shortMessage || (error as any)?.message || String(error);
-      throw new Error("Failed to create bounty: " + msg.slice(0, 250));
+      throw new Error(msg.slice(0, 300));
     }
-  }
-  private toAddr(a: string): CalldataAddress {
-    if (!/^0x[0-9a-fA-F]{40}$/.test(a)) {
-      throw new Error("Invalid address: " + a);
-    }
-    return new CalldataAddress(hexToBytes(a as `0x${string}`));
   }
 
+  // Only the bounty creator can resolve; the payout wallet is read from the PR
   async resolveBounty(
     creator: string,
     bountyId: string,
-    prUrl: string,
-    contributor: string
+    prUrl: string
   ): Promise<TransactionReceipt> {
     try {
       const txHash = await this.client.writeContract({
         address: this.contractAddress,
         functionName: "resolve_bounty",
-        args: [this.toAddr(creator), bountyId, prUrl, this.toAddr(contributor)],
+        args: [bountyId, prUrl],
         value: BigInt(0),
       });
-      const receipt = await this.client.waitForTransactionReceipt({
-        hash: txHash,
-        status: "ACCEPTED" as any,
-        retries: 60,
-        interval: 5000,
-      });
+      const receipt = await this.waitFor(txHash, 60);
       const all = await this.getBounties();
       const after = all.find(
         (b) => b.id === bountyId && b.creator.toLowerCase() === creator.toLowerCase()
       );
       if (!after || after.status !== "resolved") {
         throw new Error(
-          "The contract did not resolve this bounty. The pull request may not be merged, or the AI could not decide its severity."
+          "The contract did not resolve this bounty. The PR must be in the bounty's repo, be merged, say 'Fixes #<issue number>', and contain 'Payout: 0x...'."
         );
       }
       return receipt as TransactionReceipt;

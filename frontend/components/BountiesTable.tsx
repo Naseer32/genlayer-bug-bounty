@@ -1,10 +1,21 @@
 "use client";
 
+import { formatEther } from "viem";
 import { useBounties } from "@/lib/hooks/useBugBounty";
+import { useWallet } from "@/lib/genlayer/wallet";
+import type { Bounty } from "@/lib/contracts/types";
 import { ResolveBounty } from "./ResolveBounty";
 
 function short(a: string) {
   return a && a.length > 12 ? `${a.slice(0, 6)}...${a.slice(-4)}` : a;
+}
+
+function gen(wei: string) {
+  try {
+    return formatEther(BigInt(wei));
+  } catch {
+    return wei;
+  }
 }
 
 function statusClass(status: string) {
@@ -15,6 +26,10 @@ function statusClass(status: string) {
 
 export function BountiesTable() {
   const { data, isLoading, error, refetch, isFetching } = useBounties();
+  const { address } = useWallet();
+
+  const isCreator = (b: Bounty) =>
+    !!address && address.toLowerCase() === b.creator.toLowerCase();
 
   return (
     <div className="glass-card p-4 md:p-6">
@@ -48,7 +63,7 @@ export function BountiesTable() {
                 </a>
               </div>
               <div>
-                Issue: {b.issue_id} · Amount: {b.amount}
+                Issue: #{b.issue_id} · Escrow: {gen(b.amount)} GEN
               </div>
               <div>Creator: {short(b.creator)}</div>
               {b.severity && (
@@ -64,8 +79,15 @@ export function BountiesTable() {
                   </a>
                 </div>
               )}
-              {b.resolved_to && <div>Paid to: {short(b.resolved_to)}</div>}
-              {b.status === "open" && <ResolveBounty bounty={b} />}
+              {b.resolved_to && (
+                <div>
+                  Paid {gen(b.payout_amount ?? "0")} GEN to {short(b.resolved_to)}
+                </div>
+              )}
+              {b.status === "open" && isCreator(b) && <ResolveBounty bounty={b} />}
+              {b.status === "open" && !isCreator(b) && (
+                <div className="text-xs">Only the creator can resolve this bounty.</div>
+              )}
             </div>
           </div>
         ))}
