@@ -6,9 +6,14 @@ A maintainer creates a bounty for one issue of one GitHub repo and escrows real 
 
 - **Live app:** https://genlayer-bug-bounty-rzyh.vercel.app/
 - **Network:** GenLayer Studio (studionet)
-- **Contract (v2):** `0xb1A11A0dE45D4E770Ab67013312c36F7626D6713`
-- **Explorer:** https://explorer-studio.genlayer.com/address/0xb1A11A0dE45D4E770Ab67013312c36F7626D6713
+- **Contract (v2):** `0x99b94cDB64a812Be9080DD7C44D3D45cC339F461`
+- **Explorer:** https://explorer-studio.genlayer.com/address/0x99b94cDB64a812Be9080DD7C44D3D45cC339F461
 - **Contract file:** `contracts/bug_bounty_v2.py`
+- **Live test transactions:**
+  - Create bounty: `0x0b3177c27d9d306d8b2645eb0d7d5d7df204aa78fd1da2814d00bc1edeac7add`
+  - Resolve bounty: `0xb5a12cd1b4560961b751c0acd79e78a1d925ec93d7fc36f2c1490e968bb5d061`
+  - Payout to contributor (0.7 GEN): `0xf59a63b2a097eac4df17090d0a09a81f6545900ce7d4645750b3f72559f7abe9`
+  - Remainder (0.30 GEN): `0xca4df13c17bbb515081d3154c1e45fbef32fa8686652b92c03cbb24766deda29`
 
 ## How it works
 
