@@ -10,7 +10,7 @@ import {
 import { localnet } from "genlayer-js/chains";
 
 export default async function main(client: GenLayerClient<any>) {
-  const filePath = path.resolve(process.cwd(), "contracts/bug_bounty.py");
+  const filePath = path.resolve(process.cwd(), "contracts/bug_bounty_v2.py");
 
   try {
     const contractCode = new Uint8Array(readFileSync(filePath));
@@ -40,7 +40,7 @@ export default async function main(client: GenLayerClient<any>) {
     const deployedContractAddress =
       (client.chain as GenLayerChain).id === localnet.id
         ? receipt.data.contract_address
-        : (receipt.txDataDecoded as DecodedDeployData)?.contractAddress;
+        : (receipt as any).recipient;
 
     console.log("FULL RECEIPT:", JSON.stringify(receipt, null, 2));
     console.log(`Contract deployed at address: ${deployedContractAddress}`);

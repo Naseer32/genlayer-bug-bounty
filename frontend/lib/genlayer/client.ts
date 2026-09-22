@@ -47,7 +47,7 @@ export function getStudioUrl(): string {
  * Get the contract address from environment variables
  */
 export function getContractAddress(): string {
-  const address = "0xb1A11A0dE45D4E770Ab67013312c36F7626D6713";
+  const address = "0x99b94cDB64a812Be9080DD7C44D3D45cC339F461";
   if (!address) {
     // Return empty string during build, error will be shown in UI during runtime
     return "";
