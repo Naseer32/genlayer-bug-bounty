@@ -64,3 +64,21 @@ To reproduce: open the app, connect a wallet with some GEN on GenLayer Studio, c
 ## Version 1
 
 The first version (`contracts/bug_bounty.py`, address `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`) had no escrow and no access control. It is kept only for history.
+
+## Live test results (GenLayer Studio)
+
+The InsuranceClaimVerifier flow was tested end to end with real AI validator consensus:
+
+| Step | Tx hash |
+|---|---|
+| Deploy | 0xee607c882ef64f0df5a124c384f13aff4a015c9cfcad2d11a5c63989c775623b |
+| create_policy_pool | 0x4f32e6c454d1641a5907fc02ba2903d4a7516b24b28acbc865a900d3b6778ce0 |
+| buy_policy | 0x3a48c38c3bce1369ff3584da0cb76f3854b384b5361f0b47c8f5e7c4bff7faf5 |
+| submit_claim (claim_1) | 0xaafe35a76371e6e23ee3e5dccdf3a03f0ac85df76ea8d4e8d74c5f282d992b99 |
+| resolve_claim (claim_1, DENIED) | 0x3d579569689e1e22b53db9a33c9b1467ecb86e41cc6305b83ffb596f6b79433c |
+| submit_claim (claim_2) | 0x6accef44ccfbc0f46f5496f260f45219a1b0de15219dad6270d5b6ac8ca837ba |
+| resolve_claim (claim_2, APPROVED, 3 GEN paid) | 0x6d2e5dfee0f71c7551b07499624e4bfcd45ef99cd47a1aa01318db6bd3f7d40b |
+
+- claim_1: evidence showed general flooding in Pakistan but not damage at the insured property, so validators denied it.
+- claim_2: evidence named the insured property directly, validators approved 100% and the pool paid out 3 GEN (pool balance 7 GEN to 4 GEN).
+- Evidence for claim_2 is a test fixture (`evidence/nowshera_flood_report.txt`), not a real news article.
