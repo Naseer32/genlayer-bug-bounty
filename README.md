@@ -66,6 +66,7 @@ To reproduce: open the app, connect a wallet with some GEN on GenLayer Studio, c
 The first version (`contracts/bug_bounty.py`, address `0xaD495de36EA054f66e6a7fBF65aB2B36F24e76cF`) had no escrow and no access control. It is kept only for history.
 
 ## Live test results (GenLayer Studio)
+Contract (GenLayer Studio): 0x083041CAE1959B912eA3af5e336659E26CB38207 - https://explorer-studio.genlayer.com/address/0x083041CAE1959B912eA3af5e336659E26CB38207
 
 The InsuranceClaimVerifier flow was tested end to end with real AI validator consensus:
 
